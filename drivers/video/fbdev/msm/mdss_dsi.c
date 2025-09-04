@@ -976,7 +976,6 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 			}
 			break;
 		case FIH_ST7703_CTC_HD_PLUS_VIDEO_PANEL:
-		case FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL:
 			{
 				pr_debug("[HL]%s, %d: FIH_ST7703_CTC_HD_PLUS_VIDEO_PANEL OR FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL\n", __func__, __LINE__);
 				
@@ -1132,6 +1131,79 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 			}
 			break;
 		//SW4-HL-Display-TC358762_HX8352-BringUp-00+}_20181219
+		case FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL:
+			{
+  				pr_debug("[HL]%s, %d: FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL\n", __func__, __LINE__);
+
+				//******************************************
+				// START of VDDIO(1.8V)
+				//******************************************
+				//SW4-HL-Display-EAG_RHD-BringUpLcmDriverIC+{_20180529
+				//Pull HIGH LCM IOVCC(1.8V) Enable Pin
+				pr_debug("[HL] %s, ctrl_pdata->lcm_iovcc_gpio = %d	**********************\n\n", __func__, ctrl_pdata->lcm_iovcc_gpio);
+				if (gpio_request(ctrl_pdata->lcm_iovcc_gpio, "lcm_iovcc")) {
+				    pr_err("%s:request lcm iovcc enable gpio failed\n", __func__);
+				    //BBOX_LCM_GPIO_FAIL
+				    gpio_free(ctrl_pdata->lcm_iovcc_gpio);
+				    return -ENODEV;
+				}
+				gpio_set_value(ctrl_pdata->lcm_iovcc_gpio, 1);
+				pr_debug("[HL] %s: gpio_set_value(ctrl_pdata->lcm_iovcc_gpio, 1) **********************\n\n", __func__);
+				pr_debug("[HL]%s, %d: [IOVCC]\n", __func__, __LINE__);
+				//SW4-HL-Display-EAG_RHD-BringUpLcmDriverIC+}_20180529
+				//******************************************
+				// END of Reset Pin Sequence
+				//******************************************
+
+				udelay(10*1000);
+				pr_debug("[HL]%s, %d: [DSI] Delay 10ms AFTER VDDIO PULLED HIGH\n", __func__, __LINE__);
+
+				//******************************************
+				// START of Reset Pin Sequence
+				//******************************************
+				/*
+				 * If continuous splash screen feature is enabled, then we need to
+				 * request all the GPIOs that have already been configured in the
+				 * bootloader. This needs to be done irresepective of whether
+				 * the lp11_init flag is set or not.
+				 */
+				if (pdata->panel_info.cont_splash_enabled ||
+				        !pdata->panel_info.mipi.lp11_init)
+				{
+				      if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
+				            pr_debug("reset enable: pinctrl not enabled\n");
+				    mdss_dsi_panel_reset(pdata, 1);
+				    pr_debug("[HL]%s, %d: [RESET]\n", __func__, __LINE__);
+
+					//******************************************
+					// START of +5.5V/-5.5V Pin Sequence
+					//******************************************
+					ret = msm_mdss_enable_vreg(
+					        ctrl_pdata->panel_power_data.vreg_config,
+					        ctrl_pdata->panel_power_data.num_vreg, 1);
+					pr_debug("[HL]%s, %d: msm_mdss_enable_vreg(1) <-- END\n", __func__, __LINE__);
+					if (ret) {
+					        pr_err("%s: failed to enable vregs for %s\n",
+					                __func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
+					        return ret;
+					}
+					pr_debug("[HL]%s, %d: [AVDD/AVEE]\n", __func__, __LINE__);
+					//******************************************
+					// END of +5.5V/-5.5V Pin Sequence
+					//******************************************
+
+					udelay(15*1000);
+					pr_debug("[HL]%s, %d: [DSI] Delay 15ms AFTER +5V-5V are PULLED\n", __func__, __LINE__);
+				}
+				else
+				{
+				     pr_debug("[HL]%s, %d: NO Execute Reset Pin Sequence Here!\n", __func__, __LINE__);
+				}
+				//******************************************
+				// END of Reset Pin Sequence
+				//******************************************
+			}
+			break;
     case FIH_ST7703_TRULY_HD_PLUS_VIDEO_PANEL:
 		default:
 			{
@@ -2752,10 +2824,45 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 				}
 				break;
 			case FIH_ST7703_CTC_HD_PLUS_VIDEO_PANEL:
+	            {
+					pr_debug("[HL]%s, %d: FIH_ST7703_CTC_HD_PLUS_VIDEO_PANEL\n", __func__, __LINE__);
+					pr_debug("[HL]%s, %d: DO NOTHING HERE!\n", __func__, __LINE__);
+				}
+				break;
 			case FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL:
 				{
-					pr_debug("[HL]%s, %d: FIH_ST7703_CTC_HD_PLUS_VIDEO_PANEL OR FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL\n", __func__, __LINE__);
-          pr_debug("[HL]%s, %d: DO NOTHING HERE!\n", __func__, __LINE__);
+					pr_debug("[HL]%s, %d: FIH_ST7703_INX_HD_PLUS_VIDEO_PANEL\n", __func__, __LINE__);
+
+					//******************************************
+					// START of RESET Pin Sequence
+					//******************************************
+					if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
+					        pr_debug("reset enable: pinctrl not enabled\n");
+					mdss_dsi_panel_reset(pdata, 1);
+					pr_debug("[HL]%s, %d: [RESET]\n", __func__, __LINE__);
+					//******************************************
+					// END of RESET Pin Sequence
+					//******************************************
+
+					//******************************************
+					// START of +5.5V/-5.5V Pin Sequence
+					//******************************************
+					ret = msm_mdss_enable_vreg(
+					        ctrl_pdata->panel_power_data.vreg_config,
+					        ctrl_pdata->panel_power_data.num_vreg, 1);
+					pr_debug("[HL]%s, %d: msm_mdss_enable_vreg(1) <-- END\n", __func__, __LINE__);
+					if (ret) {
+					        pr_err("%s: failed to enable vregs for %s\n",
+					                __func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
+					        return ret;
+					}
+					pr_debug("[HL]%s, %d: [AVDD/AVEE]\n", __func__, __LINE__);
+
+					udelay(15*1000);
+					pr_debug("[HL]%s, %d: [DSI] Delay 15ms AFTER +5V-5V are PULLED\n", __func__, __LINE__);
+					//******************************************
+					// END of +5.5V/-5.5V Pin Sequence
+					//******************************************
 				}
 				break;
 			case FIH_ST7703_TRULY_HD_PLUS_VIDEO_PANEL:
